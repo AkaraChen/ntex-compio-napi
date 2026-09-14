@@ -156,9 +156,28 @@ The reference spike is unchanged and was not used as the build target. All work 
 
 ## Benchmarks
 
-Measured against Express 5.2.1 on the same machine, same route, no middleware:
-**0.49x Express at concurrency 1, but 1.83x at c=128 (one worker) and 2.88x with four
-workers, with 2.3x lower p99.** Full method, numbers and caveats:
-[`bench/RESULTS.md`](bench/RESULTS.md).
+Two rounds, both measured on the same machine against real HTTP with no middleware, server and
+load generator pinned to disjoint cores. Full method, raw data and caveats in each document.
 
-Reproduce with `bench/run-bench.sh`; raw per-run output is in `bench/results/`.
+**Extreme sweep** — 7 stacks, concurrency to **2048**, CPU + RSS sampled per run:
+[`bench/RESULTS-EXTREME.md`](bench/RESULTS-EXTREME.md)
+
+| | peak req/s | server cores used | p99 @ c=2048 |
+|---|---:|---:|---:|
+| Elysia 1.4.30 on Bun 1.4.2 | **51793** | ~1.0 | 70 ms |
+| bare `Bun.serve` | 45474 | ~1.0 | 65 ms |
+| **this project, workers=4** | **30719** | ~3.0 | 192 ms |
+| bare `node:http` | 28956 | ~1.0 | 69 ms |
+| Fastify 5.12.4 | 26957 | ~1.0 | 64 ms |
+| this project, workers=1 | 22306 | ~1.5 | 220 ms |
+| Express 5.2.1 | 13082 | ~1.0 | 69 ms |
+
+Headline: it is the **fastest Node-hosted stack** and 2.35x Express, but it spends ~3 cores to
+get there and has the **worst tail latency above c=128** — every request crosses the NAPI
+boundary into one JS thread. Practical range: **below roughly c=128**.
+
+**First round** (Express, workers 1 vs 4, concurrency to 128):
+[`bench/RESULTS.md`](bench/RESULTS.md)
+
+Reproduce with `bench/run-extreme.sh` / `bench/run-bench.sh`; raw per-run output, resource
+samples and the aggregated tables are under `bench/results-extreme/`.
