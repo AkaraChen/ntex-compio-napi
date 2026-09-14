@@ -1,3 +1,11 @@
+# Captured evidence
+
+Commands ran from `/home/akrc/Developer/ntex-compio-napi` after `. ./scripts/env.sh` on 2026-09-14. Outputs below are captured process output, not reconstructed responses. Source logs are retained in `evidence/`. M1/M2/M3 describe their historical implementations at their milestone commits; the final addon uses the JS bridge. The reference spike was not built as the deliverable.
+
+`grep -c tokio` prints 0 with exit code 1 for no matches. `cargo fmt --check` produced no output and exited 0. `scripts/build.sh` runs `cargo build --release` then copies the `.so` to `index.node`.
+
+The first M5 test run had one assertion failure (HTTP 418 phrase capitalization in the test); its original output appears after the successful final gate. No milestone remains failed.
+
 
 ## M1 — build and load
 
@@ -724,5 +732,101 @@ compio-runtime v0.11.0
         ├── ntex-net v3.15.0 (*)
         ├── ntex-server v3.11.2 (*)
         └── ntex-tls v3.8.0 (*)
+```
+
+
+## Development finding — original test failure, corrected before final gate
+
+$ `node --test test/*.test.js (first hardening run)`
+
+```text
+ss -H -ltn checked: port 18901 is free
+ss -H -ltn checked: port 18902 is free
+✖ Express-shaped API over real HTTP sockets (561.044394ms)
+ASSERT sync/async exceptions and next(err) -> 500, no timeout or hang
+ss -H -ltn checked: port 18911 is free
+✔ throws, rejections, next(err), error middleware and defaults (447.248335ms)
+ASSERT workers=1: 80/80 byte-exact replies; zero misroutes, drops or timeouts; all 80 reached JS before replies
+stats() {
+  runtime: 'compio',
+  requests: 80,
+  workers: 1,
+  inFlight: 0,
+  timedOut: 0
+}
+ss -H -ltn checked: port 18912 is free
+✔ compio workers=1: 80 concurrent distinct binary requests (493.156783ms)
+ASSERT workers=2: 80/80 byte-exact replies; zero misroutes, drops or timeouts; all 80 reached JS before replies
+stats() {
+  runtime: 'compio',
+  requests: 80,
+  workers: 2,
+  inFlight: 0,
+  timedOut: 0
+}
+ss -H -ltn checked: port 18914 is free
+✔ compio workers=2: 80 concurrent distinct binary requests (472.830156ms)
+ASSERT workers=4: 80/80 byte-exact replies; zero misroutes, drops or timeouts; all 80 reached JS before replies
+stats() {
+  runtime: 'compio',
+  requests: 80,
+  workers: 4,
+  inFlight: 0,
+  timedOut: 0
+}
+ss -H -ltn checked: port 18921 is free
+✔ compio workers=4: 80 concurrent distinct binary requests (470.921527ms)
+ASSERT unanswered handlers -> 504; late reply ignored; next request succeeds; {
+  runtime: 'compio',
+  requests: 3,
+  workers: 1,
+  inFlight: 0,
+  timedOut: 2
+}
+ss -H -ltn checked: port 18930 is free
+✔ never responding times out; late responses cannot consume a later request (733.389979ms)
+ss -H -ltn checked: port 18931 is free
+ss checked: intentionally testing our occupied port 18931
+ss -H -ltn checked: port 18930 is free
+ASSERT startup failure rejects and releases roots/channel; restart succeeds; stale IDs rejected
+✔ native validation, dispatch exceptions, duplicate response, bind failure and restart (906.668761ms)
+ss -H -ltn checked: port 18951 is free
+EXIT PROOF mode=drain status=200 callback=true stats={"runtime":"compio","requests":1,"workers":1,"inFlight":0,"timedOut":0}
+ASSERT process-exit drain: child exit code 0, no signal, within 7s watchdog
+ss -H -ltn checked: port 18951 is free
+EXIT PROOF mode=timeout status=504 callback=true stats={"runtime":"compio","requests":1,"workers":1,"inFlight":0,"timedOut":1}
+ASSERT process-exit timeout: child exit code 0, no signal, within 7s watchdog
+✔ app.close drains active requests and Node exits without process.exit (1182.003195ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 7
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5412.526698
+
+✖ failing tests:
+
+test at test/integration.test.js:20:1
+✖ Express-shaped API over real HTTP sockets (561.044394ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + "I'm a Teapot"
+  - "I'm a teapot"
+           ^
+  
+      at TestContext.<anonymous> (/home/akrc/Developer/ntex-compio-napi/test/integration.test.js:93:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1404:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: "I'm a Teapot",
+    expected: "I'm a teapot",
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
 ```
 
