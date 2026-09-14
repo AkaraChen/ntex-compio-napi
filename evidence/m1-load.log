@@ -1,0 +1,3 @@
+/home/akrc/Developer/ntex-compio-napi/index.node
+index.node: ELF 64-bit LSB shared object, x86-64, version 1 (SYSV), dynamically linked, BuildID[sha1]=58ddce7425ef4e029934aef0e16d29d424b74aa8, not stripped
+{ runtime: 'compio' }

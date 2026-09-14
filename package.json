@@ -1,0 +1,8 @@
+{
+  "name": "ntex-compio-napi",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.js",
+  "scripts": { "build": "sh scripts/build.sh", "demo": "node examples/demo.js", "test": "node --test test/*.test.js" },
+  "engines": { "node": ">=20" }
+}
