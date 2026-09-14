@@ -136,7 +136,9 @@ for (const workers of [1, 2, 4]) {
     const payloads = Array.from({ length: 80 }, (_, i) => Buffer.concat([Buffer.from(`request=${i};`), Buffer.alloc(2048 + i, i), Buffer.from([0, 255, 128])]));
     const results = await Promise.all(payloads.map((body, i) => request(port, `/echo/${i}`, { method: 'POST', body })));
     results.forEach((r, i) => { assert.equal(r.status, 200); assert.equal(r.headers['x-id'], String(i)); assert.deepEqual(r.body, payloads[i]); });
-    assert.deepEqual(app.stats(), { runtime: 'compio', requests: 80, workers, inFlight: 0, timedOut: 0 });
+    assert.deepEqual(app.stats(), { runtime: 'compio', requests: 80, workers, inFlight: 0, timedOut: 0,
+      rejected413: 0, rejected503: 0, peakInFlight: 80, queued: 0,
+      maxBodyBytes: 1048576, maxInFlight: 1024, maxQueued: 0 });
     console.log(`ASSERT workers=${workers}: 80/80 byte-exact replies; zero misroutes, drops or timeouts; all 80 reached JS before replies`);
     console.log('stats()', app.stats());
   });

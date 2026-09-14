@@ -2,7 +2,7 @@
 
 An Express-shaped JavaScript HTTP server backed by ntex **3.12.3**, compio, and Neon **1.1.1**. Routing and JSON serialization run in JavaScript. Rust transfers request/response data through a Neon Channel and asynchronous one-shot receivers.
 
-Measured on this Linux x86_64 machine: the release addon loads in Node 24.20.0, the dependency tree has **zero tokio entries**, and all **8 real-socket integration tests pass**. Compio worker counts **1, 2, and 4** each completed 80 simultaneous, distinct binary requests correctly. Two child-process tests prove natural exit after graceful shutdown. Raw output is in [EVIDENCE.md](EVIDENCE.md); completion details are in [STATUS.md](STATUS.md).
+Measured on this Linux x86_64 machine: the release addon loads in Node 24.20.0, the dependency tree has **zero tokio entries**, and all **19 real-socket integration tests pass** (the original eight plus eleven limit tests). Compio worker counts **1, 2, and 4** each completed 80 simultaneous, distinct binary requests correctly. Two child-process tests prove natural exit after graceful shutdown. Raw output is in [EVIDENCE.md](EVIDENCE.md); completion details are in [STATUS.md](STATUS.md).
 
 ## Build and run
 
@@ -80,18 +80,38 @@ Supported routing:
 
 | Export | Contract |
 | --- | --- |
-| `start(options, dispatch)` | `options` has `host`, `port`, optional `workers` and `timeoutMs`. Returns a Promise immediately; resolves to the port. Calls `dispatch(id, {method, url, headers, body, ip})` for requests. |
+| `start(options, dispatch)` | `options` has `host`, `port`, optional `workers`, `timeoutMs`, `maxBodyBytes`, `maxInFlight`, and `maxQueued`. Returns a Promise immediately; resolves to the port. Calls `dispatch(id, {method, url, headers, body, ip})` for requests. |
 | `respond(id, status, headers, body)` | Completes a pending request without waiting. Headers are an object of strings or an array of `[name, value]` string pairs. Body is a string or Buffer. Returns `false` for expired, duplicate, or stale IDs. |
 | `stop()` | Returns a Promise for graceful shutdown. Stops accepting, drains requests within the shutdown budget, releases the JS root and referenced Channel, then settles. |
-| `stats()` | Returns `{runtime: 'compio', requests, workers, inFlight, timedOut}`. The façade exposes the same result as `app.stats()`. |
+| `stats()` | Returns `{runtime: 'compio', requests, workers, inFlight, timedOut, rejected413, rejected503, peakInFlight, queued, maxInFlight, maxQueued, maxBodyBytes}`. The façade exposes the same result as `app.stats()`. |
 
 IDs are opaque decimal strings representing Rust `u64` values, avoiding JS Number precision loss. IDs remain unique across server restarts. One app can listen per Node environment; another app cannot accidentally close it.
 
 `start` creates a referenced Channel and a rooted JS dispatch function on the JS thread, then starts the `napi-http` OS thread. That thread creates `System::new("napi-http", DefaultRuntime)` and drives ntex's `HttpServer` with compio. ntex manages its own configured workers. Node signal handling remains in JS; native ntex signal handlers are disabled.
 
-Each handler collects body bytes, inserts a response sender into a shared map, schedules JS through `Channel::try_send`, and **awaits** its receiver. No Channel join is called. Short map locks never enclose an await or a JS invocation. `respond` removes the matching sender and wakes its worker. A drop guard removes pending entries if ntex cancels the request.
+Each handler checks Content-Length, reserves capacity (or asynchronously waits in the bounded queue), collects capped body bytes, and schedules JS through `Channel::try_send`. It **awaits** a one-shot receiver; no Channel join is called. Short shared-state locks never enclose an await or a JS invocation. A single drop guard owns the slot and any queued/pending entry, releasing or transferring it on response, body error, timeout, observed socket disconnect, dispatch exception, or shutdown. Socket disconnects are watched during upload, queueing, and response wait. Channel notifications are coalesced to at most one queued notification plus the callback currently running; buffered bytes remain in guarded state until dispatch so cancellation can free them before JS runs.
 
-The default JS response deadline is 30 seconds; `timeoutMs` accepts 1–600000. A missed deadline returns 504 and increments `timedOut`. This deadline starts after the request body is collected. It does not cancel JS work; subsequent replies for that ID are ignored. `inFlight` counts pending bridge responses, excluding uploads still being collected. `requests` counts native handler entries. Counters reset on start and remain readable after stop. Graceful shutdown allows the response deadline plus approximately two seconds before ntex forces remaining connections closed.
+The default JS response deadline is 30 seconds; `timeoutMs` accepts 1–600000. A missed deadline returns 504 and increments `timedOut`. This deadline starts after admission and body collection. It does not cancel JS work; subsequent replies for that ID are ignored. `requests` counts native handler entries. Counters reset on start and remain readable after stop.
+
+Shutdown pauses acceptance and drains admitted/queued requests for `timeoutMs + 2000` milliseconds. At that deadline it cancels remaining uploads and queued/active requests, closes their sockets on their owning workers, and then stops ntex. Its existing worker shutdown budget still applies afterward. This explicit bridge drain also avoids an early-shutdown behavior in pinned ntex after an earlier idle period; the regression and forced-shutdown cases are covered by real sockets.
+
+## Body and admission limits
+
+Pass these options through `createApp(options)` or native `start(options, dispatch)`:
+
+| Option | Default | Valid integer range | Effect |
+| --- | --- | --- | --- |
+| `maxBodyBytes` | 1048576 (1 MiB) | 1–1073741824 (1 GiB) | Maximum buffered request body length. |
+| `maxInFlight` | 1024 | 1–1000000 | Shared capacity across all workers. Slots are reserved before upload and held through the JS response wait. |
+| `maxQueued` | 0 | 0–1000000 | Additional requests allowed to wait for a slot; zero rejects immediately when full. |
+
+Non-finite, fractional, or out-of-range numbers throw a `RangeError`, using the same validation style as `workers` and `timeoutMs`.
+
+An oversized Content-Length receives **413 Payload Too Large before any body is read by the bridge**, even when admission is full. Otherwise each received chunk is checked before appending; crossing the cap stops collection immediately. The response names `maxBodyBytes` and its byte value. Rejected bodies are not drained. When all slots and queue entries are occupied, Rust returns **503 Service Unavailable** with `Retry-After: 1`. Both refusals close the connection; a new connection can be used for the next request.
+
+**Limit-generated 413/503 responses never reach JS dispatch, user middleware, or handlers.** Applications therefore cannot customize them through middleware. `rejected413` counts body-cap refusals; `rejected503` counts capacity refusals (not application-produced statuses or shutdown/channel failures).
+
+Admission occurs before body collection so uploads cannot build an unbounded collection of buffered requests outside the queue. `inFlight` consequently includes reserved uploads as well as pending JS responses, until the Rust handler obtains a response or exits. `peakInFlight` is the high-water mark of those reservations and cannot exceed `maxInFlight`. `queued` counts requests awaiting promotion; queued bodies are not collected by the bridge. Freed slots transfer to waiting requests in request-ID order under the same shared lock. The three configured limits are returned by `app.stats()` alongside the counters.
 
 ## Verification
 
@@ -113,9 +133,12 @@ The concurrency test requires **all 80 handlers to reach JS before releasing any
 
 Shutdown tests launch separate children with a parent watchdog. Children drain an active async response (200) or let an unanswered handler time out (504), call close, and exit naturally with code 0. They contain no `process.exit()`. The suite also checks methods, request fields, response helpers, middleware, default/custom errors, late/duplicate replies, native validation, startup failure and restart.
 
-The first hardening run passed 7/8 tests: its only failure was an incorrect test expectation for Node's capitalization of HTTP 418 (`I'm a Teapot`). The expectation now uses Node's `STATUS_CODES`. The original failure is retained in `evidence/m5-tests-first.log`. The final run passed 8/8 in 5638.708301 ms. There are no unresolved milestone failures.
+The first hardening run passed 7/8 tests: its only failure was an incorrect test expectation for Node's capitalization of HTTP 418 (`I'm a Teapot`). The expectation now uses Node's `STATUS_CODES`. The original failure is retained in `evidence/m5-tests-first.log`. The M5 final run passed 8/8 in 5638.708301 ms. The follow-up limit gate passes 19/19; the historical and current outputs are retained in EVIDENCE.md. There are no unresolved test failures.
 
 ## Deviations
+
+- **Assigned follow-up beyond the original spec:** request body caps, bounded admission/queueing, refusal counters, and limit statistics close the previously declared production gaps. Admission reserves slots before body collection, so `inFlight` now also includes uploads. The existing concurrency tests needed only an expanded expected `stats()` object for the additive fields; their original behavioral assertions remain intact.
+- **Shutdown correction required by the follow-up:** explicit asynchronous bridge draining and forced cancellation cover the pinned ntex idle-then-shutdown regression exposed by the new queue test.
 
 - **Artifact packaging:** Cargo's Linux cdylib output has a `.so` suffix. `npm run build` / `scripts/build.sh` performs the conventional copy to `.node` for Node's addon loader. A bare `cargo build --release` produces the `.so`; use the wrapper to refresh `index.node`.
 - **Small additive controls:** `timeoutMs`, `stats().timedOut`, startup/shutdown Promises, and façade `app.ready` / `app.stats()` make timeout and lifecycle behavior observable without adding native exports. Defaults preserve the requested `listen(port, cb)` shape.
@@ -125,8 +148,8 @@ The runtime/threading architecture is unchanged from the requested design. No be
 
 ## Limits and unknowns
 
-Request and response bodies are buffered and copied; there is no streaming, body-size cap, or bridge queue/backpressure limit. The response timeout bounds pending-map residence after upload, not memory usage or upload duration. Repeated incoming header names currently retain the last value; non-UTF-8 header values are converted lossily to strings. This is a small façade, not full Express compatibility.
+Request and response bodies are still fully buffered and copied; these are caps, not streaming support. Request bytes and admission are capped, but response sizes, JS-retained data/work, total process RSS, and total open connections are not. Kernel/ntex socket buffers are outside the request-byte cap. There is no separate upload or queue-wait deadline: slow uploads can hold reserved slots and delay the bounded queue until disconnect or shutdown. The JS response timeout begins after upload and does not cancel JS work. Configure an upstream connection/upload timeout if needed. Repeated incoming header names currently retain the last value; non-UTF-8 header values are converted lossily to strings. This is a small façade, not full Express compatibility.
 
-Templates, Router sub-routers, cookies/sessions, static serving, TLS and HTTP/2 are not implemented or tested. Only Linux x86_64, the recorded kernel, Rust 1.97.1, and Node 24.20.0 were measured. Long soak tests, throughput/latency benchmarks, client disconnect timing across all phases, resource-exhaustion fault injection, and abrupt Node Worker termination remain unmeasured. OS thread creation errors have a cleanup path, but that failure was not injected.
+Templates, Router sub-routers, cookies/sessions, static serving, TLS and HTTP/2 are not implemented or tested. Only Linux x86_64, the recorded kernel, Rust 1.97.1, and Node 24.20.0 were measured. Long soak tests, throughput/latency benchmarks, exhaustive client disconnect races, resource-exhaustion fault injection, and abrupt Node Worker termination remain unmeasured. OS thread creation errors have a cleanup path, but that failure was not injected.
 
 The reference spike is unchanged and was not used as the build target. All work is committed locally; nothing was pushed or published.

@@ -48,6 +48,36 @@ fn start(mut cx: FunctionContext) -> JsResult<JsPromise> {
     if !timeout.is_finite() || timeout.fract() != 0.0 || !(1.0..=600_000.0).contains(&timeout) {
         return cx.throw_range_error("timeoutMs must be an integer in 1..600000");
     }
+    let max_body_bytes = options
+        .get_opt::<JsNumber, _, _>(&mut cx, "maxBodyBytes")?
+        .map(|v| v.value(&mut cx))
+        .unwrap_or(1048576.0);
+    if !max_body_bytes.is_finite()
+        || max_body_bytes.fract() != 0.0
+        || !(1.0..=1073741824.0).contains(&max_body_bytes)
+    {
+        return cx.throw_range_error("maxBodyBytes must be an integer in 1..1073741824");
+    }
+    let max_in_flight = options
+        .get_opt::<JsNumber, _, _>(&mut cx, "maxInFlight")?
+        .map(|v| v.value(&mut cx))
+        .unwrap_or(1024.0);
+    if !max_in_flight.is_finite()
+        || max_in_flight.fract() != 0.0
+        || !(1.0..=1000000.0).contains(&max_in_flight)
+    {
+        return cx.throw_range_error("maxInFlight must be an integer in 1..1000000");
+    }
+    let max_queued = options
+        .get_opt::<JsNumber, _, _>(&mut cx, "maxQueued")?
+        .map(|v| v.value(&mut cx))
+        .unwrap_or(0.0);
+    if !max_queued.is_finite()
+        || max_queued.fract() != 0.0
+        || !(0.0..=1000000.0).contains(&max_queued)
+    {
+        return cx.throw_range_error("maxQueued must be an integer in 0..1000000");
+    }
     let (tx, rx) = oneshot::channel();
     let state = Arc::new(State {
         channel: Mutex::new(Some(cx.channel())),
@@ -59,7 +89,12 @@ fn start(mut cx: FunctionContext) -> JsResult<JsPromise> {
         workers: workers as usize,
         timeout_ms: timeout as u32,
         timed_out: AtomicU64::new(0),
-        pending: Mutex::new(std::collections::HashMap::new()),
+        pending: Mutex::new(bridge::Pending::default()),
+        max_body_bytes: max_body_bytes as usize,
+        max_in_flight: max_in_flight as usize,
+        max_queued: max_queued as usize,
+        rejected413: AtomicU64::new(0),
+        rejected503: AtomicU64::new(0),
     });
     STATE.with(|s| *s.borrow_mut() = Some(state.clone()));
     let (deferred, promise) = cx.promise();
@@ -145,11 +180,11 @@ fn stats(mut cx: FunctionContext) -> JsResult<JsObject> {
             .map_or(0, |s| s.requests.load(Ordering::Relaxed)) as f64,
     );
     let workers = cx.number(state.as_ref().map_or(0, |s| s.workers) as f64);
-    let in_flight = cx.number(
-        state
-            .as_ref()
-            .map_or(0, |s| s.pending.lock().unwrap().len()) as f64,
-    );
+    let (in_flight, peak, queued) = state.as_ref().map_or((0, 0, 0), |s| {
+        let pending = s.pending.lock().unwrap();
+        (pending.active.len(), pending.peak, pending.queued.len())
+    });
+    let in_flight = cx.number(in_flight as f64);
     let timed_out = cx.number(
         state
             .as_ref()
@@ -159,6 +194,37 @@ fn stats(mut cx: FunctionContext) -> JsResult<JsObject> {
     result.set(&mut cx, "workers", workers)?;
     result.set(&mut cx, "inFlight", in_flight)?;
     result.set(&mut cx, "timedOut", timed_out)?;
+    for (name, value) in [
+        ("peakInFlight", peak as u64),
+        ("queued", queued as u64),
+        (
+            "maxBodyBytes",
+            state.as_ref().map_or(1048576, |s| s.max_body_bytes) as u64,
+        ),
+        (
+            "maxInFlight",
+            state.as_ref().map_or(1024, |s| s.max_in_flight) as u64,
+        ),
+        (
+            "maxQueued",
+            state.as_ref().map_or(0, |s| s.max_queued) as u64,
+        ),
+        (
+            "rejected413",
+            state
+                .as_ref()
+                .map_or(0, |s| s.rejected413.load(Ordering::Relaxed)),
+        ),
+        (
+            "rejected503",
+            state
+                .as_ref()
+                .map_or(0, |s| s.rejected503.load(Ordering::Relaxed)),
+        ),
+    ] {
+        let value = cx.number(value as f64);
+        result.set(&mut cx, name, value)?;
+    }
     Ok(result)
 }
 #[neon::main]

@@ -50,6 +50,17 @@ pub fn spawn(
                         move |mut cx| Ok(cx.number(port)),
                     );
                     let _ = stop.await;
+                    // ntex 3.12.3's HTTP shutdown receiver can already be resolved
+                    // after an earlier idle period. Drain our guarded requests first.
+                    let mut drained = state.begin_shutdown();
+                    server.pause().await;
+                    let budget = ntex::time::Millis(state.timeout_ms + 2000);
+                    if ntex::time::timeout(budget, &mut drained).await.is_err() {
+                        // Includes stalled uploads and queues. Close their I/O on its
+                        // owning worker before stopping that worker's runtime.
+                        state.cancel_all();
+                        let _ = drained.await;
+                    }
                     server.stop(true).await;
                     server.await
                 })
@@ -84,7 +95,11 @@ fn finish(state: Arc<State>, ready: Ready, error: Option<String>) {
                 )?;
                 ready.reject(&mut cx, err);
             }
-            cleanup.pending.lock().unwrap().clear();
+            {
+                let mut pending = cleanup.pending.lock().unwrap();
+                pending.queued.clear();
+                pending.active.clear();
+            }
             if let Some(root) = cleanup.dispatch.lock().unwrap().take() {
                 root.drop(&mut cx);
             }

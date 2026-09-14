@@ -1,0 +1,146 @@
+
+> ntex-compio-napi@0.1.0 test
+> node --test test/*.test.js
+
+ss -H -ltn checked: port 18901 is free
+ss -H -ltn checked: port 18902 is free
+✔ Express-shaped API over real HTTP sockets (589.867127ms)
+ASSERT sync/async exceptions and next(err) -> 500, no timeout or hang
+ss -H -ltn checked: port 18911 is free
+✔ throws, rejections, next(err), error middleware and defaults (442.224868ms)
+ASSERT workers=1: 80/80 byte-exact replies; zero misroutes, drops or timeouts; all 80 reached JS before replies
+stats() {
+  runtime: 'compio',
+  requests: 80,
+  workers: 1,
+  inFlight: 0,
+  timedOut: 0,
+  peakInFlight: 80,
+  queued: 0,
+  maxBodyBytes: 1048576,
+  maxInFlight: 1024,
+  maxQueued: 0,
+  rejected413: 0,
+  rejected503: 0
+}
+ss -H -ltn checked: port 18912 is free
+✔ compio workers=1: 80 concurrent distinct binary requests (501.94927ms)
+ASSERT workers=2: 80/80 byte-exact replies; zero misroutes, drops or timeouts; all 80 reached JS before replies
+stats() {
+  runtime: 'compio',
+  requests: 80,
+  workers: 2,
+  inFlight: 0,
+  timedOut: 0,
+  peakInFlight: 80,
+  queued: 0,
+  maxBodyBytes: 1048576,
+  maxInFlight: 1024,
+  maxQueued: 0,
+  rejected413: 0,
+  rejected503: 0
+}
+ss -H -ltn checked: port 18914 is free
+✔ compio workers=2: 80 concurrent distinct binary requests (454.814587ms)
+ASSERT workers=4: 80/80 byte-exact replies; zero misroutes, drops or timeouts; all 80 reached JS before replies
+stats() {
+  runtime: 'compio',
+  requests: 80,
+  workers: 4,
+  inFlight: 0,
+  timedOut: 0,
+  peakInFlight: 80,
+  queued: 0,
+  maxBodyBytes: 1048576,
+  maxInFlight: 1024,
+  maxQueued: 0,
+  rejected413: 0,
+  rejected503: 0
+}
+ss -H -ltn checked: port 18921 is free
+✔ compio workers=4: 80 concurrent distinct binary requests (483.241634ms)
+ASSERT unanswered handlers -> 504; late reply ignored; next request succeeds; {
+  runtime: 'compio',
+  requests: 3,
+  workers: 1,
+  inFlight: 0,
+  timedOut: 2,
+  peakInFlight: 1,
+  queued: 0,
+  maxBodyBytes: 1048576,
+  maxInFlight: 1024,
+  maxQueued: 0,
+  rejected413: 0,
+  rejected503: 0
+}
+ss -H -ltn checked: port 18930 is free
+✔ never responding times out; late responses cannot consume a later request (739.864069ms)
+ss -H -ltn checked: port 18931 is free
+ss checked: intentionally testing our occupied port 18931
+ss -H -ltn checked: port 18930 is free
+ASSERT startup failure rejects and releases roots/channel; restart succeeds; stale IDs rejected
+✔ native validation, dispatch exceptions, duplicate response, bind failure and restart (876.806218ms)
+ss -H -ltn checked: port 18951 is free
+EXIT PROOF mode=drain status=200 callback=true stats={"runtime":"compio","requests":1,"workers":1,"inFlight":0,"timedOut":0,"peakInFlight":1,"queued":0,"maxBodyBytes":1048576,"maxInFlight":1024,"maxQueued":0,"rejected413":0,"rejected503":0}
+ASSERT process-exit drain: child exit code 0, no signal, within 7s watchdog
+ss -H -ltn checked: port 18951 is free
+EXIT PROOF mode=timeout status=504 callback=true stats={"runtime":"compio","requests":1,"workers":1,"inFlight":0,"timedOut":1,"peakInFlight":1,"queued":0,"maxBodyBytes":1048576,"maxInFlight":1024,"maxQueued":0,"rejected413":0,"rejected503":0}
+ASSERT process-exit timeout: child exit code 0, no signal, within 7s watchdog
+✔ app.close drains active requests and Node exits without process.exit (1208.566731ms)
+ss -H -ltn checked: port 19001 is free
+DEFAULT LIMITS {"runtime":"compio","requests":0,"workers":1,"inFlight":0,"timedOut":0,"peakInFlight":0,"queued":0,"maxBodyBytes":1048576,"maxInFlight":1024,"maxQueued":0,"rejected413":0,"rejected503":0}
+ss -H -ltn checked: port 19001 is free
+ss -H -ltn checked: port 19002 is free
+✔ limit validation and configured defaults (827.823859ms)
+BODY CAP dispatch=3 (accepted only) {"runtime":"compio","requests":6,"workers":1,"inFlight":0,"timedOut":0,"peakInFlight":1,"queued":0,"maxBodyBytes":16,"maxInFlight":1,"maxQueued":0,"rejected413":3,"rejected503":0}
+ss -H -ltn checked: port 19003 is free
+✔ 413: Content-Length precheck, exact cap, cap+1, incomplete chunked upload, fresh connections (436.041336ms)
+OVERSIZED N=32 cap=65536 RSS_before_bytes=61554688 RSS_after_bytes=68280320 RSS_delta_bytes=6725632
+OVERSIZED STATS {"runtime":"compio","requests":33,"workers":2,"inFlight":0,"timedOut":0,"peakInFlight":23,"queued":0,"maxBodyBytes":65536,"maxInFlight":32,"maxQueued":0,"rejected413":32,"rejected503":0}
+ss -H -ltn checked: port 19011 is free
+✔ 64 KiB cap: concurrent oversized uploads and measured RSS (471.053611ms)
+ADMISSION workers=1 dispatch=4 {"runtime":"compio","requests":12,"workers":1,"inFlight":0,"timedOut":0,"peakInFlight":4,"queued":0,"maxBodyBytes":1048576,"maxInFlight":4,"maxQueued":0,"rejected413":0,"rejected503":8}
+ss -H -ltn checked: port 19012 is free
+✔ admission workers=1: 4 dispatched, 8 refused, gate release (418.854704ms)
+ADMISSION workers=2 dispatch=4 {"runtime":"compio","requests":12,"workers":2,"inFlight":0,"timedOut":0,"peakInFlight":4,"queued":0,"maxBodyBytes":1048576,"maxInFlight":4,"maxQueued":0,"rejected413":0,"rejected503":8}
+ss -H -ltn checked: port 19020 is free
+✔ admission workers=2: 4 dispatched, 8 refused, gate release (424.309428ms)
+QUEUE FIFO + queued disconnect {"runtime":"compio","requests":5,"workers":2,"inFlight":0,"timedOut":0,"peakInFlight":1,"queued":0,"maxBodyBytes":1048576,"maxInFlight":1,"maxQueued":2,"rejected413":0,"rejected503":1}
+ss -H -ltn checked: port 19021 is free
+✔ bounded queue, queued disconnect, FIFO transfer and recovery (439.188278ms)
+DISCONNECT active + upload, no timeout {"runtime":"compio","requests":4,"workers":1,"inFlight":0,"timedOut":0,"peakInFlight":1,"queued":0,"maxBodyBytes":1048576,"maxInFlight":1,"maxQueued":0,"rejected413":0,"rejected503":0}
+ss -H -ltn checked: port 19021 is free
+TIMEOUT slot recovered {"runtime":"compio","requests":2,"workers":1,"inFlight":0,"timedOut":1,"peakInFlight":1,"queued":0,"maxBodyBytes":1048576,"maxInFlight":1,"maxQueued":0,"rejected413":0,"rejected503":0}
+ss -H -ltn checked: port 19022 is free
+✔ slot release: timeout, late reply, active disconnect, body disconnect and payload error (1023.229932ms)
+✖ native dispatch throw and shutdown release active and queued slots (6072.39967ms)
+ℹ Error: Test "native dispatch throw and shutdown release active and queued slots" at test/limits.test.js:203:1 generated asynchronous activity after the test ended. This activity created the error "Error: HTTP timeout: GET /queued" and would have caused the test to fail, but instead triggered an unhandledRejection event.
+ℹ tests 16
+ℹ suites 0
+ℹ pass 15
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 10301.072411
+
+✖ failing tests:
+
+test at test/limits.test.js:203:1
+✖ native dispatch throw and shutdown release active and queued slots (6072.39967ms)
+  Error: HTTP timeout: GET /never
+      at ClientRequest.<anonymous> (/home/akrc/Developer/ntex-compio-napi/test/helpers.js:19:44)
+      at ClientRequest.wrapper (node:events:639:12)
+      at ClientRequest.emit (node:events:514:28)
+      at Socket.emitRequestTimeout (node:_http_client:1122:9)
+      at Socket.wrapper (node:events:639:12)
+      at Socket.emit (node:events:526:24)
+      at Socket._onTimeout (node:net:822:8)
+      at Timeout.onStreamTimeout [as _onTimeout] (node:internal/stream_base_commons:237:10)
+      at listOnTimeout (node:internal/timers:687:11)
+      at process.processTimers (node:internal/timers:618:7)
+npm notice
+npm notice New major version of npm available! 11.19.0 -> 12.0.2
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.0.2
+npm notice To update run: npm install -g npm@12.0.2
+npm notice
