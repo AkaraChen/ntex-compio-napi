@@ -1,0 +1,15 @@
+[package]
+name = "spike-ntex-compio"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.88"
+
+[[bin]]
+name = "spike"
+path = "src/main.rs"
+
+[dependencies]
+ntex = { version = "=3.12.3", features = ["compio"] }
+
+[profile.dev]
+debug = 0
