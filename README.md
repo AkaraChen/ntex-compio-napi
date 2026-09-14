@@ -153,3 +153,12 @@ Request and response bodies are still fully buffered and copied; these are caps,
 Templates, Router sub-routers, cookies/sessions, static serving, TLS and HTTP/2 are not implemented or tested. Only Linux x86_64, the recorded kernel, Rust 1.97.1, and Node 24.20.0 were measured. Long soak tests, throughput/latency benchmarks, exhaustive client disconnect races, resource-exhaustion fault injection, and abrupt Node Worker termination remain unmeasured. OS thread creation errors have a cleanup path, but that failure was not injected.
 
 The reference spike is unchanged and was not used as the build target. All work is committed locally; nothing was pushed or published.
+
+## Benchmarks
+
+Measured against Express 5.2.1 on the same machine, same route, no middleware:
+**0.49x Express at concurrency 1, but 1.83x at c=128 (one worker) and 2.88x with four
+workers, with 2.3x lower p99.** Full method, numbers and caveats:
+[`bench/RESULTS.md`](bench/RESULTS.md).
+
+Reproduce with `bench/run-bench.sh`; raw per-run output is in `bench/results/`.
