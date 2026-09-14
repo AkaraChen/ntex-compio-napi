@@ -1,0 +1,34 @@
+compio-runtime v0.11.0
+├── compio-net v0.11.1
+│   └── ntex-net v3.15.0
+│       ├── ntex v3.12.3
+│       │   └── ntex-compio-napi v0.1.0 (/home/akrc/Developer/ntex-compio-napi)
+│       ├── ntex-h2 v3.13.0
+│       │   └── ntex v3.12.3 (*)
+│       ├── ntex-server v3.11.2
+│       │   ├── ntex v3.12.3 (*)
+│       │   └── ntex-h2 v3.13.0 (*)
+│       └── ntex-tls v3.8.0
+│           └── ntex v3.12.3 (*)
+├── ntex-net v3.15.0 (*)
+└── ntex-rt v3.17.2
+    ├── ntex v3.12.3 (*)
+    ├── ntex-io v3.13.1
+    │   ├── ntex v3.12.3 (*)
+    │   ├── ntex-dispatcher v3.2.1
+    │   │   ├── ntex v3.12.3 (*)
+    │   │   └── ntex-h2 v3.13.0 (*)
+    │   ├── ntex-h2 v3.13.0 (*)
+    │   ├── ntex-net v3.15.0 (*)
+    │   ├── ntex-server v3.11.2 (*)
+    │   └── ntex-tls v3.8.0 (*)
+    ├── ntex-net v3.15.0 (*)
+    ├── ntex-server v3.11.2 (*)
+    └── ntex-util v3.6.1
+        ├── ntex v3.12.3 (*)
+        ├── ntex-dispatcher v3.2.1 (*)
+        ├── ntex-h2 v3.13.0 (*)
+        ├── ntex-io v3.13.1 (*)
+        ├── ntex-net v3.15.0 (*)
+        ├── ntex-server v3.11.2 (*)
+        └── ntex-tls v3.8.0 (*)

@@ -309,3 +309,102 @@ index.node: ELF 64-bit LSB shared object, x86-64, version 1 (SYSV), dynamically 
 { runtime: 'compio' }
 ```
 
+
+## M2 — native fixed response (before JS bridge)
+
+$ `sh scripts/build.sh`
+
+```text
+   Compiling ntex-compio-napi v0.1.0 (/home/akrc/Developer/ntex-compio-napi)
+    Finished `release` profile [optimized] target(s) in 4.53s
+```
+
+$ `python3 scripts/native-smoke.py m2`
+
+```text
+$ ss -ltnp
+State  Recv-Q Send-Q               Local Address:Port  Peer Address:PortProcess                                   
+LISTEN 0      512                      127.0.0.1:3000       0.0.0.0:*    users:(("bun",pid=3190643,fd=10))        
+LISTEN 0      511                      127.0.0.1:44379      0.0.0.0:*    users:(("Paseo Daemon",pid=563665,fd=24))
+LISTEN 0      4096                     127.0.0.1:19514      0.0.0.0:*    users:(("multica",pid=3624,fd=6))        
+LISTEN 0      4096                 127.0.0.53%lo:53         0.0.0.0:*                                             
+LISTEN 0      4096                     127.0.0.1:17680      0.0.0.0:*    users:(("agentosd",pid=3953816,fd=6))    
+LISTEN 0      4096                     127.0.0.1:2019       0.0.0.0:*                                             
+LISTEN 0      5                        127.0.0.1:18080      0.0.0.0:*    users:(("python3",pid=3953829,fd=3))     
+LISTEN 0      4096                     127.0.0.1:39163      0.0.0.0:*                                             
+LISTEN 0      4096                       0.0.0.0:22         0.0.0.0:*                                             
+LISTEN 0      511                      127.0.0.1:6767       0.0.0.0:*    users:(("Paseo Daemon",pid=563665,fd=25))
+LISTEN 0      4096                     127.0.0.1:8080       0.0.0.0:*                                             
+LISTEN 0      4096                     127.0.0.1:8090       0.0.0.0:*                                             
+LISTEN 0      4096                    127.0.0.54:53         0.0.0.0:*                                             
+LISTEN 0      511                      127.0.0.1:5173       0.0.0.0:*    users:(("MainThread",pid=3136795,fd=21)) 
+LISTEN 0      4096                 100.99.181.23:62289      0.0.0.0:*                                             
+LISTEN 0      4096   [fd7a:115c:a1e0::c534:b518]:55029         [::]:*                                             
+LISTEN 0      4096                          [::]:22            [::]:*                                             
+LISTEN 0      4096                             *:80               *:*                                             
+$ node scripts/native-smoke.js
+READY
+$ curl -i --max-time 5 http://127.0.0.1:18721/hello
+  % Total    % Received % Xferd  Average Speed  Time    Time    Time   Current
+                                 Dload  Upload  Total   Spent   Left   Speed
+
+  0      0   0      0   0      0      0      0                              0
+100     35 100     35   0      0  18786      0                              0
+100     35 100     35   0      0  17552      0                              0
+100     35 100     35   0      0  16924      0                              0
+HTTP/1.1 200 OK
+content-length: 35
+content-type: text/plain; charset=utf-8
+date: Mon, 14 Sep 2026 08:22:54 GMT
+
+fixed response from Rust on compio
+stats { runtime: 'compio', requests: 1, workers: 1, inFlight: 0 }
+STOPPED
+Node exited naturally after stop: code=0
+```
+
+$ `cargo tree -e normal | grep -c tokio`
+
+```text
+0
+```
+
+$ `cargo tree -i compio-runtime`
+
+```text
+compio-runtime v0.11.0
+├── compio-net v0.11.1
+│   └── ntex-net v3.15.0
+│       ├── ntex v3.12.3
+│       │   └── ntex-compio-napi v0.1.0 (/home/akrc/Developer/ntex-compio-napi)
+│       ├── ntex-h2 v3.13.0
+│       │   └── ntex v3.12.3 (*)
+│       ├── ntex-server v3.11.2
+│       │   ├── ntex v3.12.3 (*)
+│       │   └── ntex-h2 v3.13.0 (*)
+│       └── ntex-tls v3.8.0
+│           └── ntex v3.12.3 (*)
+├── ntex-net v3.15.0 (*)
+└── ntex-rt v3.17.2
+    ├── ntex v3.12.3 (*)
+    ├── ntex-io v3.13.1
+    │   ├── ntex v3.12.3 (*)
+    │   ├── ntex-dispatcher v3.2.1
+    │   │   ├── ntex v3.12.3 (*)
+    │   │   └── ntex-h2 v3.13.0 (*)
+    │   ├── ntex-h2 v3.13.0 (*)
+    │   ├── ntex-net v3.15.0 (*)
+    │   ├── ntex-server v3.11.2 (*)
+    │   └── ntex-tls v3.8.0 (*)
+    ├── ntex-net v3.15.0 (*)
+    ├── ntex-server v3.11.2 (*)
+    └── ntex-util v3.6.1
+        ├── ntex v3.12.3 (*)
+        ├── ntex-dispatcher v3.2.1 (*)
+        ├── ntex-h2 v3.13.0 (*)
+        ├── ntex-io v3.13.1 (*)
+        ├── ntex-net v3.15.0 (*)
+        ├── ntex-server v3.11.2 (*)
+        └── ntex-tls v3.8.0 (*)
+```
+
