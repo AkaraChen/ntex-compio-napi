@@ -469,3 +469,113 @@ STOPPED
 Node exited naturally after stop: code=0
 ```
 
+
+## M4 — every demo route over real HTTP
+
+$ `python3 scripts/demo-smoke.py`
+
+```text
+$ ss -ltnp
+State  Recv-Q Send-Q               Local Address:Port  Peer Address:PortProcess                                   
+LISTEN 0      512                      127.0.0.1:3000       0.0.0.0:*    users:(("bun",pid=3190643,fd=10))        
+LISTEN 0      511                      127.0.0.1:44379      0.0.0.0:*    users:(("Paseo Daemon",pid=563665,fd=24))
+LISTEN 0      4096                     127.0.0.1:19514      0.0.0.0:*    users:(("multica",pid=3624,fd=6))        
+LISTEN 0      4096                 127.0.0.53%lo:53         0.0.0.0:*                                             
+LISTEN 0      4096                     127.0.0.1:17680      0.0.0.0:*    users:(("agentosd",pid=3953816,fd=6))    
+LISTEN 0      4096                     127.0.0.1:2019       0.0.0.0:*                                             
+LISTEN 0      5                        127.0.0.1:18080      0.0.0.0:*    users:(("python3",pid=3953829,fd=3))     
+LISTEN 0      4096                     127.0.0.1:39163      0.0.0.0:*                                             
+LISTEN 0      4096                       0.0.0.0:22         0.0.0.0:*                                             
+LISTEN 0      511                      127.0.0.1:6767       0.0.0.0:*    users:(("Paseo Daemon",pid=563665,fd=25))
+LISTEN 0      4096                     127.0.0.1:8080       0.0.0.0:*                                             
+LISTEN 0      4096                     127.0.0.1:8090       0.0.0.0:*                                             
+LISTEN 0      4096                    127.0.0.54:53         0.0.0.0:*                                             
+LISTEN 0      511                      127.0.0.1:5173       0.0.0.0:*    users:(("MainThread",pid=3136795,fd=21)) 
+LISTEN 0      4096                 100.99.181.23:62289      0.0.0.0:*                                             
+LISTEN 0      4096   [fd7a:115c:a1e0::c534:b518]:55029         [::]:*                                             
+LISTEN 0      4096                          [::]:22            [::]:*                                             
+LISTEN 0      4096                             *:80               *:*                                             
+$ node examples/demo.js
+READY: listening on 18731
+$ curl -sS -i --max-time 5 http://127.0.0.1:18731/hello
+HTTP/1.1 200 OK
+content-length: 11
+content-type: text/html; charset=utf-8
+x-powered-by: ntex-compio-neon
+date: Mon, 14 Sep 2026 08:26:50 GMT
+
+Hello World
+$ curl -sS -i --max-time 5 http://127.0.0.1:18731/users/alice
+HTTP/1.1 200 OK
+content-length: 14
+content-type: application/json; charset=utf-8
+x-powered-by: ntex-compio-neon
+date: Mon, 14 Sep 2026 08:26:50 GMT
+
+{"id":"alice"}
+$ curl -sS -i --max-time 5 -X POST --data-binary 'hello body' http://127.0.0.1:18731/echo
+HTTP/1.1 200 OK
+content-length: 20
+content-type: application/json; charset=utf-8
+x-powered-by: ntex-compio-neon
+date: Mon, 14 Sep 2026 08:26:50 GMT
+
+{"got":"hello body"}
+$ curl -sS -i --max-time 5 http://127.0.0.1:18731/optional
+HTTP/1.1 200 OK
+content-length: 16
+content-type: application/json; charset=utf-8
+x-powered-by: ntex-compio-neon
+date: Mon, 14 Sep 2026 08:26:50 GMT
+
+{"name":"world"}
+$ curl -sS -i --max-time 5 http://127.0.0.1:18731/optional/Ada
+HTTP/1.1 200 OK
+content-length: 14
+content-type: application/json; charset=utf-8
+x-powered-by: ntex-compio-neon
+date: Mon, 14 Sep 2026 08:26:50 GMT
+
+{"name":"Ada"}
+$ curl -sS -i --max-time 5 http://127.0.0.1:18731/files/a/b.txt
+HTTP/1.1 200 OK
+content-length: 7
+content-type: text/html; charset=utf-8
+x-powered-by: ntex-compio-neon
+date: Mon, 14 Sep 2026 08:26:50 GMT
+
+a/b.txt
+$ curl -sS -i --max-time 5 http://127.0.0.1:18731/missing
+HTTP/1.1 404 Not Found
+content-length: 19
+content-type: text/plain; charset=utf-8
+x-powered-by: ntex-compio-neon
+date: Mon, 14 Sep 2026 08:26:50 GMT
+
+Cannot GET /missing
+$ curl -sS -i --max-time 5 http://127.0.0.1:18731/fail
+HTTP/1.1 500 Internal Server Error
+content-length: 24
+content-type: application/json; charset=utf-8
+x-powered-by: ntex-compio-neon
+date: Mon, 14 Sep 2026 08:26:50 GMT
+
+{"error":"demo failure"}
+GET /hello
+GET /users/alice
+POST /echo
+GET /optional
+GET /optional/Ada
+GET /files/a/b.txt
+GET /missing
+GET /fail
+CLOSED {
+  runtime: 'compio',
+  requests: 8,
+  workers: 1,
+  inFlight: 0,
+  timedOut: 0
+}
+Node exited naturally: code=0
+```
+
