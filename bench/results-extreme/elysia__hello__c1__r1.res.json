@@ -1,0 +1,1 @@
+{"wall_seconds": 9.989, "pids": {"2933759": {"cpu_seconds": 5.29, "cpu_cores": 0.5296, "peak_rss_mb": 48.28, "samples": 99}, "2933812": {"cpu_seconds": 6.88, "cpu_cores": 0.6887, "peak_rss_mb": 14.93, "samples": 99}}}
