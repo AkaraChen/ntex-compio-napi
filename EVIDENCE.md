@@ -9,7 +9,7 @@ cargo 1.97.1 (c980f4866 2026-06-30)
 v24.20.0
 ```
 
-$ `sh scripts/build.sh (cargo build --release; copy .so to index.node), tail -6`
+$ `sh scripts/build.sh (cargo build --release; copy .so to index.node)`
 
 ```text
     Updating crates.io index
@@ -301,7 +301,7 @@ $ `sh scripts/build.sh (cargo build --release; copy .so to index.node), tail -6`
     Finished `release` profile [optimized] target(s) in 44.98s
 ```
 
-$ `realpath index.node; file index.node; node -e "console.log(require(\x27./index.node\x27).stats())"`
+$ `realpath index.node; file index.node; node -e "console.log(require('./index.node').stats())"`
 
 ```text
 /home/akrc/Developer/ntex-compio-napi/index.node
@@ -577,5 +577,152 @@ CLOSED {
   timedOut: 0
 }
 Node exited naturally: code=0
+```
+
+
+## M5 — final hardening gate
+
+$ `sh scripts/build.sh`
+
+```text
+   Compiling ntex-compio-napi v0.1.0 (/home/akrc/Developer/ntex-compio-napi)
+    Finished `release` profile [optimized] target(s) in 5.69s
+```
+
+$ `cargo clippy --all-targets -- -D warnings`
+
+```text
+    Checking ntex-compio-napi v0.1.0 (/home/akrc/Developer/ntex-compio-napi)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.52s
+```
+
+$ `node --test test/*.test.js`
+
+```text
+ss -H -ltn checked: port 18901 is free
+ss -H -ltn checked: port 18902 is free
+✔ Express-shaped API over real HTTP sockets (584.662308ms)
+ASSERT sync/async exceptions and next(err) -> 500, no timeout or hang
+ss -H -ltn checked: port 18911 is free
+✔ throws, rejections, next(err), error middleware and defaults (464.425848ms)
+ASSERT workers=1: 80/80 byte-exact replies; zero misroutes, drops or timeouts; all 80 reached JS before replies
+stats() {
+  runtime: 'compio',
+  requests: 80,
+  workers: 1,
+  inFlight: 0,
+  timedOut: 0
+}
+ss -H -ltn checked: port 18912 is free
+✔ compio workers=1: 80 concurrent distinct binary requests (504.365858ms)
+ASSERT workers=2: 80/80 byte-exact replies; zero misroutes, drops or timeouts; all 80 reached JS before replies
+stats() {
+  runtime: 'compio',
+  requests: 80,
+  workers: 2,
+  inFlight: 0,
+  timedOut: 0
+}
+ss -H -ltn checked: port 18914 is free
+✔ compio workers=2: 80 concurrent distinct binary requests (524.469356ms)
+ASSERT workers=4: 80/80 byte-exact replies; zero misroutes, drops or timeouts; all 80 reached JS before replies
+stats() {
+  runtime: 'compio',
+  requests: 80,
+  workers: 4,
+  inFlight: 0,
+  timedOut: 0
+}
+ss -H -ltn checked: port 18921 is free
+✔ compio workers=4: 80 concurrent distinct binary requests (485.333211ms)
+ASSERT unanswered handlers -> 504; late reply ignored; next request succeeds; {
+  runtime: 'compio',
+  requests: 3,
+  workers: 1,
+  inFlight: 0,
+  timedOut: 2
+}
+ss -H -ltn checked: port 18930 is free
+✔ never responding times out; late responses cannot consume a later request (742.836904ms)
+ss -H -ltn checked: port 18931 is free
+ss checked: intentionally testing our occupied port 18931
+ss -H -ltn checked: port 18930 is free
+ASSERT startup failure rejects and releases roots/channel; restart succeeds; stale IDs rejected
+✔ native validation, dispatch exceptions, duplicate response, bind failure and restart (911.374075ms)
+ss -H -ltn checked: port 18951 is free
+EXIT PROOF mode=drain status=200 callback=true stats={"runtime":"compio","requests":1,"workers":1,"inFlight":0,"timedOut":0}
+ASSERT process-exit drain: child exit code 0, no signal, within 7s watchdog
+ss -H -ltn checked: port 18951 is free
+EXIT PROOF mode=timeout status=504 callback=true stats={"runtime":"compio","requests":1,"workers":1,"inFlight":0,"timedOut":1}
+ASSERT process-exit timeout: child exit code 0, no signal, within 7s watchdog
+✔ app.close drains active requests and Node exits without process.exit (1241.706603ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5638.708301
+```
+
+$ `realpath index.node; file index.node; node -e "const n = require('./index.node'); console.log(Object.keys(n)); console.log(n.stats())"`
+
+```text
+/home/akrc/Developer/ntex-compio-napi/index.node
+index.node: ELF 64-bit LSB shared object, x86-64, version 1 (SYSV), dynamically linked, BuildID[sha1]=9c40dab30d6318da6fe6e2e9036bdaea88bdf251, not stripped
+[ 'start', 'respond', 'stop', 'stats' ]
+{
+  runtime: 'compio',
+  requests: 0,
+  workers: 0,
+  inFlight: 0,
+  timedOut: 0
+}
+```
+
+$ `cargo tree -e normal | grep -c tokio`
+
+```text
+0
+```
+
+$ `cargo tree -i compio-runtime`
+
+```text
+compio-runtime v0.11.0
+├── compio-net v0.11.1
+│   └── ntex-net v3.15.0
+│       ├── ntex v3.12.3
+│       │   └── ntex-compio-napi v0.1.0 (/home/akrc/Developer/ntex-compio-napi)
+│       ├── ntex-h2 v3.13.0
+│       │   └── ntex v3.12.3 (*)
+│       ├── ntex-server v3.11.2
+│       │   ├── ntex v3.12.3 (*)
+│       │   └── ntex-h2 v3.13.0 (*)
+│       └── ntex-tls v3.8.0
+│           └── ntex v3.12.3 (*)
+├── ntex-net v3.15.0 (*)
+└── ntex-rt v3.17.2
+    ├── ntex v3.12.3 (*)
+    ├── ntex-io v3.13.1
+    │   ├── ntex v3.12.3 (*)
+    │   ├── ntex-dispatcher v3.2.1
+    │   │   ├── ntex v3.12.3 (*)
+    │   │   └── ntex-h2 v3.13.0 (*)
+    │   ├── ntex-h2 v3.13.0 (*)
+    │   ├── ntex-net v3.15.0 (*)
+    │   ├── ntex-server v3.11.2 (*)
+    │   └── ntex-tls v3.8.0 (*)
+    ├── ntex-net v3.15.0 (*)
+    ├── ntex-server v3.11.2 (*)
+    └── ntex-util v3.6.1
+        ├── ntex v3.12.3 (*)
+        ├── ntex-dispatcher v3.2.1 (*)
+        ├── ntex-h2 v3.13.0 (*)
+        ├── ntex-io v3.13.1 (*)
+        ├── ntex-net v3.15.0 (*)
+        ├── ntex-server v3.11.2 (*)
+        └── ntex-tls v3.8.0 (*)
 ```
 
