@@ -133,3 +133,29 @@ sudo ./run-bench.sh          # needs `oha` and `express` installed; see run-benc
 ```
 
 Raw per-run output from `oha` is in `results/`; the aggregate table is `results/summary.tsv`.
+
+---
+
+## Independent check of the admission / body limits
+
+`bench/verify-limits.js` is a from-scratch client — my own assertions, my own ports, **not** the
+repo's own test suite — for the limits added in `1860eb2`. Run it as two processes, because the
+native module holds one global server state and the facade allows one listening app per Node
+environment:
+
+```sh
+node bench/verify-limits.js body       # 10 checks
+node bench/verify-limits.js admission  #  9 checks
+```
+
+**Result on this box: 19/19 pass.**
+
+- oversized body -> `413`, and the JS dispatch callback is **never invoked** (asserted with a counter)
+- body exactly at the cap -> 200; cap+1 -> 413
+- chunked body with no `Content-Length` that exceeds the cap mid-stream -> 413
+- a normal request immediately after a 413 still succeeds — the listener is not wedged
+- `maxInFlight=2, maxQueued=0` against 8 concurrent slow requests ->
+  `statuses=[200,200,503,503,503,503,503,503]`, `Retry-After: 1`, and exactly **2** reached JS
+- after the burst `inFlight` returns to 0 and the server serves normally again
+- `stats()` reports `peakInFlight=2`, so the bound demonstrably engaged rather than merely
+  being configured
